@@ -115,10 +115,13 @@ func (r *relayChat) setRequest() error {
 
 	r.originalModel = r.chatRequest.Model
 
+	log.Printf("Before preprocessing: %+v\n", r.chatRequest)
 	// Add preprocessing step
 	if err := r.preprocessMessages(); err != nil {
 		return err
 	}
+	
+	log.Printf("After preprocessing: %+v\n", r.chatRequest)
 
 	return nil
 }
