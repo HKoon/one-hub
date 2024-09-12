@@ -10,6 +10,7 @@ import (
 	"one-api/common"
 	"one-api/common/requester"
 	"one-api/common/utils"
+	"log"
 	providersBase "one-api/providers/base"
 	"one-api/types"
 	"sync"
@@ -132,16 +133,16 @@ func (r *relayChat) preprocessMessages() error {
 	// 根据模型名称获取 preprompt 和 guideline
 	preprompt, guideline := getPrepromptAndGuidelineCached(model)
 
-	// 处理 system 消息
+	// 查找唯一的 system 消息并进行处理
 	for i, message := range r.chatRequest.Messages {
 		if message.Role == "system" {
 			content, ok := message.Content.(string)
 			if !ok {
 				return errors.New("系统消息的内容不是字符串类型")
 			}
-			// 为系统消息添加 preprompt 和 guideline
+			// 为 system 消息添加 preprompt 和 guideline
 			r.chatRequest.Messages[i].Content = preprompt + content + guideline
-			return nil
+			break // 找到 system 消息后立即退出循环
 		}
 	}
 
