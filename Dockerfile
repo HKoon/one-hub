@@ -2,6 +2,7 @@ FROM node:16 as builder
 
 WORKDIR /build
 COPY web/package.json .
+RUN npm cache clean --force
 RUN npm install
 COPY ./web .
 COPY ./VERSION .
