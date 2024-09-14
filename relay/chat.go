@@ -132,6 +132,7 @@ func (r *relayChat) preprocessMessages() error {
 
 	// 根据模型名称获取 preprompt 和 guideline
 	preprompt, guideline := getPrepromptAndGuidelineCached(model)
+	fmt.Printf("Preprompt: %s, Guideline: %s\n", preprompt, guideline)
 
 	// 查找唯一的 system 消息并进行处理
 	for i, message := range r.chatRequest.Messages {
