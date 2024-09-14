@@ -2,8 +2,10 @@ FROM node:16 as builder
 
 WORKDIR /build
 COPY web/package.json .
-RUN npm cache clean --force
-RUN npm install
+RUN npm install -g npm@10.8.3   # 更新 npm
+RUN npm cache clean --force     # 清除缓存
+RUN rm -rf node_modules package-lock.json  # 删除 node_modules 和锁文件
+RUN npm install                 # 重新安装依赖
 COPY ./web .
 COPY ./VERSION .
 RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat VERSION) npm run build
