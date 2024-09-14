@@ -2,6 +2,7 @@ FROM node:16 as builder
 
 WORKDIR /build
 COPY web/package.json .
+RUN npm install -g npm@10.8.3
 RUN npm install
 COPY ./web .
 COPY ./VERSION .
