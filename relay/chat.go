@@ -132,11 +132,6 @@ func (r *relayChat) preprocessMessages() error {
 	// 根据模型名称获取 preprompt 和 guideline
 	preprompt, guideline := getPrepromptAndGuidelineCached(model)
 
-	// 加锁的打印，避免并发竞争
-	cacheMutex.RLock()
-	fmt.Printf("Preprompt: %s, Guideline: %s\n", preprompt, guideline)
-	cacheMutex.RUnlock()
-
 	// 查找唯一的 system 消息并进行处理
 	for i, message := range r.chatRequest.Messages {
 		if message.Role == "system" {
