@@ -77,17 +77,16 @@ func getPrepromptAndGuidelineCached(modelName string) (string, string) {
 		return "", ""
 	}
 
-	// 查找模型对应的组
+	// 加锁读取缓存中的 preprompt 和 guideline
 	cacheMutex.RLock()
+	defer cacheMutex.RUnlock() // 确保解锁
+
+	// 查找模型对应的组
 	groupName, modelExists := chatConfig.Models[modelName]
-	cacheMutex.RUnlock()
 
 	// 如果模型存在，获取该组的 preprompt 和 guideline
 	if modelExists {
-		cacheMutex.RLock()
 		groupConfig, groupExists := chatConfig.Groups[groupName]
-		cacheMutex.RUnlock()
-
 		if groupExists {
 			return groupConfig.Preprompt, groupConfig.Guideline
 		}
@@ -132,7 +131,11 @@ func (r *relayChat) preprocessMessages() error {
 
 	// 根据模型名称获取 preprompt 和 guideline
 	preprompt, guideline := getPrepromptAndGuidelineCached(model)
-	log.Printf("Preprompt: %s, Guideline: %s\n", preprompt, guideline)
+
+	// 加锁的打印，避免并发竞争
+	cacheMutex.RLock()
+	fmt.Printf("Preprompt: %s, Guideline: %s\n", preprompt, guideline)
+	cacheMutex.RUnlock()
 
 	// 查找唯一的 system 消息并进行处理
 	for i, message := range r.chatRequest.Messages {
