@@ -115,7 +115,22 @@ func (r *relayChat) setRequest() error {
 
 	r.originalModel = r.chatRequest.Model
 
+	
 	log.Printf("Before preprocessing: %+v\n", r.chatRequest)
+	// Handle model-specific parameters
+	switch r.chatRequest.Model {
+	case "lilSeraphim":
+		// Set specific parameters for lilSeraphim model
+		r.chatRequest.Temperature = 1.12
+		// Add additional parameters
+		r.chatRequest.MinP = 0.075
+		r.chatRequest.RepetitionPenalty = 1.10
+		// log the changes
+		log.Printf("Applied custom parameters for lilSeraphim: Temperature=%.2f, MinP=%.3f, RepetitionPenalty=%.2f\n", r.chatRequest.Temperature, r.chatRequest.MinP, r.chatRequest.RepetitionPenalty)
+	default:
+		// Optionally, handle other models here
+	}
+
 	// Add preprocessing step
 	if err := r.preprocessMessages(); err != nil {
 		return err
