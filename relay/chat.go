@@ -91,6 +91,12 @@ func getPrepromptAndGuidelineCached(modelName string) (string, string) {
 			return groupConfig.Preprompt, groupConfig.Guideline
 		}
 	}
+	
+	if modelExists {
+    		log.Printf("System is Preprocessed. Model Name: %s, Group Name: %s", modelName, groupName)
+	} else {
+    		log.Printf("System is Preprocessed. Model Name: %s (Default)", modelName)
+	}
 
 	// 如果没有找到模型或组，返回默认的 preprompt 和 guideline
 	return chatConfig.Defaults.Preprompt, chatConfig.Defaults.Guideline
@@ -144,8 +150,7 @@ func (r *relayChat) preprocessMessages() error {
 			break // 找到 system 消息后立即退出循环
 		}
 	}
-        log.Printf("System is Preprocessed:%+v\n": guideline)
-
+	
 	// 如果没有找到 system 消息，可以选择添加新的系统消息
 	/*
 	newSystemMessage := ChatCompletionMessage{
