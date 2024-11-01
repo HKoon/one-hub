@@ -115,13 +115,13 @@ func (r *relayChat) setRequest() error {
 
 	r.originalModel = r.chatRequest.Model
 
-	log.Printf("Before preprocessing: %+v\n", r.chatRequest)
+	// log.Printf("Before preprocessing: %+v\n", r.chatRequest)
 	// Add preprocessing step
 	if err := r.preprocessMessages(); err != nil {
 		return err
 	}
 	
-	log.Printf("After preprocessing: %+v\n", r.chatRequest)
+	// log.Printf("After preprocessing: %+v\n", r.chatRequest)
 
 	return nil
 }
@@ -144,6 +144,7 @@ func (r *relayChat) preprocessMessages() error {
 			break // 找到 system 消息后立即退出循环
 		}
 	}
+        log.Printf("System is Preprocessed:%+v\n": guideline)
 
 	// 如果没有找到 system 消息，可以选择添加新的系统消息
 	/*
