@@ -138,7 +138,7 @@ func (r *relayChat) send() (err *types.OpenAIErrorWithStatusCode, done bool) {
 		}
 
 		var firstResponseTime time.Time
-		firstResponseTime, err = r.responseStreamClientWithFilter(response, doneStr)
+		firstResponseTime, err = responseStreamClient(r.c, response, doneStr)
 		r.SetFirstResponseTime(firstResponseTime)
 	} else {
 		var response *types.ChatCompletionResponse
@@ -161,138 +161,6 @@ func (r *relayChat) send() (err *types.OpenAIErrorWithStatusCode, done bool) {
 	}
 
 	return
-}
-
-// responseStreamClientWithFilter 处理流式响应并过滤think标签
-func (r *relayChat) responseStreamClientWithFilter(response requester.StreamReaderInterface[string], doneStr func() string) (time.Time, *types.OpenAIErrorWithStatusCode) {
-	var firstResponseTime time.Time
-	var buffer strings.Builder
-	var inThinkTag bool
-	var thinkTagDepth int
-
-	// 设置响应头
-	r.c.Header("Content-Type", "text/event-stream")
-	r.c.Header("Cache-Control", "no-cache")
-	r.c.Header("Connection", "keep-alive")
-	r.c.Header("Access-Control-Allow-Origin", "*")
-
-	for {
-		chunk, streamErr := response.Recv()
-		if streamErr != nil {
-			break
-		}
-
-		if firstResponseTime.IsZero() {
-			firstResponseTime = time.Now()
-		}
-
-		// 解析流式响应
-		lines := strings.Split(chunk, "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" || line == "data: [DONE]" {
-				continue
-			}
-
-			if strings.HasPrefix(line, "data: ") {
-				data := strings.TrimPrefix(line, "data: ")
-				var streamResponse types.ChatCompletionStreamResponse
-				if err := json.Unmarshal([]byte(data), &streamResponse); err != nil {
-					continue
-				}
-
-				// 处理流式内容的think标签过滤
-				for i := range streamResponse.Choices {
-					// 根据实际类型处理Delta.Content字段
-					if content, ok := streamResponse.Choices[i].Delta.Content.(string); ok && content != "" {
-						filteredContent := r.filterStreamContent(content, &buffer, &inThinkTag, &thinkTagDepth)
-						
-						if filteredContent != "" {
-							streamResponse.Choices[i].Delta.Content = filteredContent
-							// 重新编码并发送
-							responseData, _ := json.Marshal(streamResponse)
-							r.c.Writer.WriteString("data: " + string(responseData) + "\n\n")
-							r.c.Writer.(http.Flusher).Flush()
-						}
-					} else if content == "" || streamResponse.Choices[i].Delta.Content == nil {
-						// 非内容数据直接发送
-						responseData, _ := json.Marshal(streamResponse)
-						r.c.Writer.WriteString("data: " + string(responseData) + "\n\n")
-						r.c.Writer.(http.Flusher).Flush()
-					}
-				}
-			} else {
-				// 非data行直接发送
-				r.c.Writer.WriteString(line + "\n")
-				r.c.Writer.(http.Flusher).Flush()
-			}
-		}
-	}
-
-	// 发送完成信号
-	if doneStr != "" {
-		usageData := doneStr()
-		if usageData != "" {
-			r.c.Writer.WriteString("data: " + usageData + "\n\n")
-		}
-	}
-	r.c.Writer.WriteString("data: [DONE]\n\n")
-	r.c.Writer.(http.Flusher).Flush()
-
-	return firstResponseTime, nil
-}
-
-// filterStreamContent 过滤流式内容中的think标签
-func (r *relayChat) filterStreamContent(content string, buffer *strings.Builder, inThinkTag *bool, thinkTagDepth *int) string {
-	buffer.WriteString(content)
-	fullContent := buffer.String()
-	
-	var result strings.Builder
-	i := 0
-	
-	for i < len(fullContent) {
-		if *inThinkTag {
-			// 在think标签内，寻找结束标签
-			if i+8 <= len(fullContent) && fullContent[i:i+8] == "</think>" {
-				*thinkTagDepth--
-				if *thinkTagDepth <= 0 {
-					*inThinkTag = false
-					*thinkTagDepth = 0
-				}
-				i += 8
-				continue
-			} else if i+7 <= len(fullContent) && fullContent[i:i+7] == "<think>" {
-				*thinkTagDepth++
-				i += 7
-				continue
-			}
-			i++
-		} else {
-			// 不在think标签内，寻找开始标签
-			if i+7 <= len(fullContent) && fullContent[i:i+7] == "<think>" {
-				*inThinkTag = true
-				*thinkTagDepth = 1
-				i += 7
-				continue
-			} else {
-				result.WriteByte(fullContent[i])
-				i++
-			}
-		}
-	}
-	
-	// 更新buffer
-	buffer.Reset()
-	if *inThinkTag && result.Len() == 0 {
-		// 如果还在think标签内且没有输出内容，保留一部分内容用于下次处理
-		if len(fullContent) > 100 {
-			buffer.WriteString(fullContent[len(fullContent)-100:])
-		} else {
-			buffer.WriteString(fullContent)
-		}
-	}
-	
-	return result.String()
 }
 
 func (r *relayChat) getUsageResponse() string {
