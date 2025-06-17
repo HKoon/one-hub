@@ -13,10 +13,17 @@ import (
 	providersBase "one-api/providers/base"
 	"one-api/safty"
 	"one-api/types"
+	"regexp"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+// filterThinkTags 过滤掉 <think>...</think> 标签及其内容
+func filterThinkTags(content string) string {
+	re := regexp.MustCompile(`(?s)<think>.*?</think>`)
+	return re.ReplaceAllString(content, "")
+}
 
 type relayChat struct {
 	relayBase
@@ -114,7 +121,8 @@ func (r *relayChat) send() (err *types.OpenAIErrorWithStatusCode, done bool) {
 		}
 
 		var firstResponseTime time.Time
-		firstResponseTime, err = responseStreamClient(r.c, response, doneStr)
+		// 使用自定义的流式响应处理函数
+		firstResponseTime, err = r.responseStreamClientWithFilter(r.c, response, doneStr)
 		r.SetFirstResponseTime(firstResponseTime)
 	} else {
 		var response *types.ChatCompletionResponse
@@ -127,8 +135,9 @@ func (r *relayChat) send() (err *types.OpenAIErrorWithStatusCode, done bool) {
 			r.heartbeat.Stop()
 		}
 
+		// 过滤响应内容
+		r.filterChatResponse(response)
 		err = responseJsonClient(r.c, response)
-
 	}
 
 	if err != nil {
@@ -158,4 +167,78 @@ func (r *relayChat) getUsageResponse() string {
 	}
 
 	return ""
+}
+
+// filterChatResponse 过滤聊天响应中的 <think> 标签
+func (r *relayChat) filterChatResponse(response *types.ChatCompletionResponse) {
+	for i := range response.Choices {
+		if response.Choices[i].Message.Content != nil {
+			switch content := response.Choices[i].Message.Content.(type) {
+			case string:
+				response.Choices[i].Message.Content = filterThinkTags(content)
+			case []interface{}:
+				// 处理多模态内容
+				for j, item := range content {
+					if textItem, ok := item.(map[string]interface{}); ok {
+						if textItem["type"] == "text" {
+							if text, exists := textItem["text"].(string); exists {
+								textItem["text"] = filterThinkTags(text)
+								content[j] = textItem
+							}
+						}
+					}
+				}
+				response.Choices[i].Message.Content = content
+			}
+		}
+	}
+}
+
+// responseStreamClientWithFilter 带过滤功能的流式响应处理
+func (r *relayChat) responseStreamClientWithFilter(c *gin.Context, stream requester.StreamReaderInterface[string], endHandler func() string) (firstResponseTime time.Time, errWithOP *types.OpenAIErrorWithStatusCode) {
+	requester.SetEventStreamHeaders(c)
+	dataChan, errChan := stream.Recv()
+
+	done := make(chan struct{})
+	var finalErr *types.OpenAIErrorWithStatusCode
+
+	defer stream.Close()
+
+	var isFirstResponse bool
+
+	go func() {
+		defer close(done)
+
+		for {
+			select {
+			case data, ok := <-dataChan:
+				if !ok {
+					return
+				}
+				// 过滤 <think>...</think> 标签内容
+				filteredData := filterThinkTags(data)
+				streamData := "data: " + filteredData + "\n\n"
+
+				if !isFirstResponse {
+					firstResponseTime = time.Now()
+					isFirstResponse = true
+				}
+
+				select {
+				case <-c.Request.Context().Done():
+					// 客户端已断开
+				default:
+					c.Writer.Write([]byte(streamData))
+					c.Writer.Flush()
+				}
+
+			case err := <-errChan:
+				// 错误处理逻辑...
+				return
+			}
+		}
+	}()
+
+	<-done
+	return firstResponseTime, finalErr
 }
