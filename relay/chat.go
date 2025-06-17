@@ -91,25 +91,10 @@ func (r *relayChat) filterThinkTagsFromResponse(response *types.ChatCompletionRe
 	}
 
 	for i := range response.Choices {
-		if response.Choices[i].Message.Content != nil {
-			content := *response.Choices[i].Message.Content
+		// 根据实际类型处理Content字段
+		if content, ok := response.Choices[i].Message.Content.(string); ok {
 			filteredContent := removeThinkTags(content)
-			response.Choices[i].Message.Content = &filteredContent
-		}
-	}
-}
-
-// filterThinkTagsFromStreamResponse 过滤流式响应中的think标签
-func (r *relayChat) filterThinkTagsFromStreamResponse(response *types.ChatCompletionStreamResponse) {
-	if response == nil {
-		return
-	}
-
-	for i := range response.Choices {
-		if response.Choices[i].Delta.Content != nil {
-			content := *response.Choices[i].Delta.Content
-			filteredContent := removeThinkTags(content)
-			response.Choices[i].Delta.Content = &filteredContent
+			response.Choices[i].Message.Content = filteredContent
 		}
 	}
 }
@@ -185,13 +170,16 @@ func (r *relayChat) responseStreamClientWithFilter(response requester.StreamRead
 	var inThinkTag bool
 	var thinkTagDepth int
 
+	// 设置响应头
+	r.c.Header("Content-Type", "text/event-stream")
+	r.c.Header("Cache-Control", "no-cache")
+	r.c.Header("Connection", "keep-alive")
+	r.c.Header("Access-Control-Allow-Origin", "*")
+
 	for {
-		chunk, err := response.Recv()
-		if err != nil {
-			if err.Error() == "EOF" {
-				break
-			}
-			return firstResponseTime, common.StringErrorWrapperLocal(err.Error(), "stream_error", http.StatusInternalServerError)
+		chunk, streamErr := response.Recv()
+		if streamErr != nil {
+			break
 		}
 
 		if firstResponseTime.IsZero() {
@@ -215,24 +203,28 @@ func (r *relayChat) responseStreamClientWithFilter(response requester.StreamRead
 
 				// 处理流式内容的think标签过滤
 				for i := range streamResponse.Choices {
-					if streamResponse.Choices[i].Delta.Content != nil {
-						content := *streamResponse.Choices[i].Delta.Content
+					// 根据实际类型处理Delta.Content字段
+					if content, ok := streamResponse.Choices[i].Delta.Content.(string); ok && content != "" {
 						filteredContent := r.filterStreamContent(content, &buffer, &inThinkTag, &thinkTagDepth)
 						
 						if filteredContent != "" {
-							streamResponse.Choices[i].Delta.Content = &filteredContent
+							streamResponse.Choices[i].Delta.Content = filteredContent
 							// 重新编码并发送
 							responseData, _ := json.Marshal(streamResponse)
 							r.c.Writer.WriteString("data: " + string(responseData) + "\n\n")
-							r.c.Writer.Flush()
+							r.c.Writer.(http.Flusher).Flush()
 						}
-					} else {
+					} else if content == "" || streamResponse.Choices[i].Delta.Content == nil {
 						// 非内容数据直接发送
 						responseData, _ := json.Marshal(streamResponse)
 						r.c.Writer.WriteString("data: " + string(responseData) + "\n\n")
-						r.c.Writer.Flush()
+						r.c.Writer.(http.Flusher).Flush()
 					}
 				}
+			} else {
+				// 非data行直接发送
+				r.c.Writer.WriteString(line + "\n")
+				r.c.Writer.(http.Flusher).Flush()
 			}
 		}
 	}
@@ -245,7 +237,7 @@ func (r *relayChat) responseStreamClientWithFilter(response requester.StreamRead
 		}
 	}
 	r.c.Writer.WriteString("data: [DONE]\n\n")
-	r.c.Writer.Flush()
+	r.c.Writer.(http.Flusher).Flush()
 
 	return firstResponseTime, nil
 }
@@ -289,11 +281,15 @@ func (r *relayChat) filterStreamContent(content string, buffer *strings.Builder,
 		}
 	}
 	
-	// 更新buffer为处理后的内容
+	// 更新buffer
 	buffer.Reset()
-	if *inThinkTag {
-		// 如果还在think标签内，保留当前内容用于下次处理
-		buffer.WriteString(fullContent)
+	if *inThinkTag && result.Len() == 0 {
+		// 如果还在think标签内且没有输出内容，保留一部分内容用于下次处理
+		if len(fullContent) > 100 {
+			buffer.WriteString(fullContent[len(fullContent)-100:])
+		} else {
+			buffer.WriteString(fullContent)
+		}
 	}
 	
 	return result.String()
