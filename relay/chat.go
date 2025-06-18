@@ -150,8 +150,11 @@ func (r *relayChat) send() (err *types.OpenAIErrorWithStatusCode, done bool) {
 		if r.heartbeat != nil {
 			r.heartbeat.Stop()
 		}
-
-		// 过滤响应内容中的think标签
+    
+    // 修改响应中的模型名称
+		response.Model = r.originalModel
+		
+    // 过滤响应内容中的think标签
 		r.filterThinkTagsFromResponse(response)
 		err = responseJsonClient(r.c, response)
 	}
@@ -169,7 +172,7 @@ func (r *relayChat) getUsageResponse() string {
 			ID:      fmt.Sprintf("chatcmpl-%s", utils.GetUUID()),
 			Object:  "chat.completion.chunk",
 			Created: utils.GetTimestamp(),
-			Model:   r.chatRequest.Model,
+			Model:   r.originalModel, //r.chatRequest.Model,
 			Choices: []types.ChatCompletionStreamChoice{},
 			Usage:   r.provider.GetUsage(),
 		}
