@@ -93,7 +93,7 @@ func (r *relayChat) filterThinkTagsFromResponse(response *types.ChatCompletionRe
 	for i := range response.Choices {
 		// 根据实际类型处理Content字段
 		if content, ok := response.Choices[i].Message.Content.(string); ok {
-			filteredContent := content //removeThinkTags(content)
+			filteredContent := removeThinkTags(content)
 			response.Choices[i].Message.Content = filteredContent
 		}
 	}
