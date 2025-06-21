@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { useState, useEffect, useCallback } from 'react';
 
-import { showInfo, showError, showSuccess } from 'utils/common';
+import { showInfo, showError, showSuccess, useCanEditChannel } from 'utils/common';
 import { API } from 'utils/api';
 import { CHANNEL_OPTIONS } from 'constants/ChannelConstants';
 import { useTranslation } from 'react-i18next';
@@ -108,6 +108,7 @@ function statusInfo(t, status) {
 
 export default function ChannelTableRow({ item, manageChannel, onRefresh, groupOptions, modelOptions, prices }) {
   const { t } = useTranslation();
+  const canEditChannel = useCanEditChannel(); // 检查是否可以编辑渠道
   const popover = usePopover();
   const confirmDelete = useBoolean();
   const check = useBoolean();
@@ -566,12 +567,14 @@ export default function ChannelTableRow({ item, manageChannel, onRefresh, groupO
               </IconButton>
             )}
 
-            <Tooltip title={t('common.edit')} placement="top" arrow>
-              <IconButton onClick={quickEdit.onTrue} size="small">
-                <Icon icon="solar:pen-bold" />
-              </IconButton>
-            </Tooltip>
-            {!item.tag && (
+            {canEditChannel && (
+              <Tooltip title={t('common.edit')} placement="top" arrow>
+                <IconButton onClick={quickEdit.onTrue} size="small">
+                  <Icon icon="solar:pen-bold" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {!item.tag && canEditChannel && (
               <IconButton onClick={popover.onOpen} size="small">
                 <Icon icon="eva:more-vertical-fill" />
               </IconButton>

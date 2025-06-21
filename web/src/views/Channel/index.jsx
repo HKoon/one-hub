@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { showError, showSuccess, showInfo, trims } from 'utils/common';
+import { showError, showSuccess, showInfo, trims, useCanEditChannel } from 'utils/common';
 import AdminContainer from 'ui-component/AdminContainer';
 
 import { useTheme } from '@mui/material/styles';
@@ -70,6 +70,7 @@ export async function fetchChannelData(page, rowsPerPage, keyword, order, orderB
 // CHANNEL_OPTIONS,
 export default function ChannelList() {
   const { t } = useTranslation();
+  const canEditChannel = useCanEditChannel();
   const [page, setPage] = useState(0);
   const [order, setOrder] = useState('desc');
   const [orderBy, setOrderBy] = useState('id');
@@ -403,14 +404,16 @@ export default function ChannelList() {
           </Typography>
         </Stack>
 
-        <ButtonGroup variant="contained" aria-label="outlined small primary button group">
-          <Button color="primary" startIcon={<Icon icon="solar:add-circle-line-duotone" />} onClick={() => handleOpenModal(0)}>
-            {t('channel_index.newChannel')}
-          </Button>
-          <Button color="primary" startIcon={<Icon icon="solar:menu-dots-bold-duotone" />} onClick={() => setOpenBatchModal(true)}>
-            {t('channel_index.batchProcessing')}
-          </Button>
-        </ButtonGroup>
+        {canEditChannel && (
+          <ButtonGroup variant="contained" aria-label="outlined small primary button group">
+            <Button color="primary" startIcon={<Icon icon="solar:add-circle-line-duotone" />} onClick={() => handleOpenModal(0)}>
+              {t('channel_index.newChannel')}
+            </Button>
+            <Button color="primary" startIcon={<Icon icon="solar:menu-dots-bold-duotone" />} onClick={() => setOpenBatchModal(true)}>
+              {t('channel_index.batchProcessing')}
+            </Button>
+          </ButtonGroup>
+        )}
       </Stack>
       <Stack mb={5}>
         <Alert severity="info">
@@ -448,24 +451,28 @@ export default function ChannelList() {
                 <Button onClick={searchChannels} startIcon={<Icon icon="solar:magnifer-bold-duotone" width={18} />}>
                   {t('channel_index.search')}
                 </Button>
-                <Button
-                  onClick={() => handlePopoverOpen(t('channel_index.testAllChannels'), testAllChannels)}
-                  startIcon={<Icon icon="solar:test-tube-bold-duotone" width={18} />}
-                >
-                  {t('channel_index.testAllChannels')}
-                </Button>
-                <Button
-                  onClick={() => handlePopoverOpen(t('channel_index.updateEnabledBalance'), updateAllChannelsBalance)}
-                  startIcon={<Icon icon="solar:dollar-minimalistic-bold-duotone" width={18} />}
-                >
-                  {t('channel_index.updateEnabledBalance')}
-                </Button>
-                <Button
-                  onClick={() => handlePopoverOpen(t('channel_index.deleteDisabledChannels'), deleteAllDisabledChannels)}
-                  startIcon={<Icon icon="solar:trash-bin-trash-bold-duotone" width={18} />}
-                >
-                  {t('channel_index.deleteDisabledChannels')}
-                </Button>
+                {canEditChannel && (
+                  <>
+                    <Button
+                      onClick={() => handlePopoverOpen(t('channel_index.testAllChannels'), testAllChannels)}
+                      startIcon={<Icon icon="solar:test-tube-bold-duotone" width={18} />}
+                    >
+                      {t('channel_index.testAllChannels')}
+                    </Button>
+                    <Button
+                      onClick={() => handlePopoverOpen(t('channel_index.updateEnabledBalance'), updateAllChannelsBalance)}
+                      startIcon={<Icon icon="solar:dollar-minimalistic-bold-duotone" width={18} />}
+                    >
+                      {t('channel_index.updateEnabledBalance')}
+                    </Button>
+                    <Button
+                      onClick={() => handlePopoverOpen(t('channel_index.deleteDisabledChannels'), deleteAllDisabledChannels)}
+                      startIcon={<Icon icon="solar:trash-bin-trash-bold-duotone" width={18} />}
+                    >
+                      {t('channel_index.deleteDisabledChannels')}
+                    </Button>
+                  </>
+                )}
               </ButtonGroup>
             ) : (
               <Stack
@@ -481,21 +488,25 @@ export default function ChannelList() {
                 <IconButton onClick={searchChannels} size="large">
                   <Icon width={20} icon="solar:magnifer-bold-duotone" />
                 </IconButton>
-                <IconButton onClick={() => handlePopoverOpen(t('channel_index.testAllChannels'), testAllChannels)} size="large">
-                  <Icon width={20} icon="solar:test-tube-bold-duotone" />
-                </IconButton>
-                <IconButton
-                  onClick={() => handlePopoverOpen(t('channel_index.updateEnabledBalance'), updateAllChannelsBalance)}
-                  size="large"
-                >
-                  <Icon width={20} icon="solar:dollar-minimalistic-bold-duotone" />
-                </IconButton>
-                <IconButton
-                  onClick={() => handlePopoverOpen(t('channel_index.deleteDisabledChannels'), deleteAllDisabledChannels)}
-                  size="large"
-                >
-                  <Icon width={20} icon="solar:trash-bin-trash-bold-duotone" />
-                </IconButton>
+                {canEditChannel && (
+                  <>
+                    <IconButton onClick={() => handlePopoverOpen(t('channel_index.testAllChannels'), testAllChannels)} size="large">
+                      <Icon width={20} icon="solar:test-tube-bold-duotone" />
+                    </IconButton>
+                    <IconButton
+                      onClick={() => handlePopoverOpen(t('channel_index.updateEnabledBalance'), updateAllChannelsBalance)}
+                      size="large"
+                    >
+                      <Icon width={20} icon="solar:dollar-minimalistic-bold-duotone" />
+                    </IconButton>
+                    <IconButton
+                      onClick={() => handlePopoverOpen(t('channel_index.deleteDisabledChannels'), deleteAllDisabledChannels)}
+                      size="large"
+                    >
+                      <Icon width={20} icon="solar:trash-bin-trash-bold-duotone" />
+                    </IconButton>
+                  </>
+                )}
               </Stack>
             )}
           </Container>

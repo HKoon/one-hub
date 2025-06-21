@@ -146,6 +146,13 @@ export function useIsAdmin() {
   return user.role >= 10;
 }
 
+// 判断是否为超级管理员（可以编辑渠道）
+export function useCanEditChannel() {
+  const { user } = useSelector((state) => state.account);
+  if (!user) return false;
+  return user.role >= 100; // 只有超级管理员(role=100)可以编辑渠道
+}
+
 export function timestamp2string(timestamp) {
   let date = new Date(timestamp * 1000);
   let year = date.getFullYear().toString();

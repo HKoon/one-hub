@@ -125,7 +125,7 @@ func SetApiRouter(router *gin.Engine) {
 
 		}
 		channelRoute := apiRouter.Group("/channel")
-		channelRoute.Use(middleware.AdminAuth())
+		channelRoute.Use(middleware.ChannelEditAuth())
 		{
 			channelRoute.GET("/", controller.GetChannelsList)
 			channelRoute.GET("/models", relay.ListModelsForAdmin)
@@ -145,7 +145,7 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.DELETE("/batch", controller.BatchDeleteChannel)
 		}
 		channelTagRoute := apiRouter.Group("/channel_tag")
-		channelTagRoute.Use(middleware.AdminAuth())
+		channelTagRoute.Use(middleware.ChannelEditAuth())
 		{
 			channelTagRoute.GET("/_all", controller.GetChannelsTagAllList)
 			channelTagRoute.GET("/:tag/list", controller.GetChannelsTagList)
@@ -235,7 +235,7 @@ func SetApiRouter(router *gin.Engine) {
 	sseRouter := router.Group("/api/sse")
 	sseRouter.Use(middleware.GlobalAPIRateLimit())
 	{
-		sseRouter.POST("/channel/check", middleware.AdminAuth(), controller.CheckChannel)
+		sseRouter.POST("/channel/check", middleware.ChannelEditAuth(), controller.CheckChannel)
 	}
 
 }

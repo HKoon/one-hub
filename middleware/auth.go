@@ -113,6 +113,29 @@ func RootAuth() func(c *gin.Context) {
 	}
 }
 
+// ChannelEditAuth 限制administrator角色编辑渠道，只允许查看
+func ChannelEditAuth() func(c *gin.Context) {
+	return func(c *gin.Context) {
+		// 首先进行基本的管理员权限验证
+		authHelper(c, config.RoleAdminUser)
+		
+		// 获取用户角色
+		role := c.GetInt("role")
+		
+		// 如果是administrator角色(role=10)且不是GET请求，则拒绝访问
+		if role == config.RoleAdminUser && c.Request.Method != "GET" {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "管理员角色只能查看渠道信息，无法进行编辑操作",
+			})
+			c.Abort()
+			return
+		}
+		
+		c.Next()
+	}
+}
+
 func tokenAuth(c *gin.Context, key string) {
 	key = strings.TrimPrefix(key, "Bearer ")
 	key = strings.TrimPrefix(key, "sk-")
