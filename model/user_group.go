@@ -14,7 +14,7 @@ type UserGroup struct {
 	Symbol    string  `json:"symbol" gorm:"type:varchar(50);uniqueIndex"`
 	Name      string  `json:"name" gorm:"type:varchar(50)"`
 	Ratio     float64 `json:"ratio" gorm:"type:decimal(10,2); default:1"`      // 倍率
-	APIRate   int     `json:"api_rate" gorm:"default:10000"`  // 每分钟10000次请求
+	APIRate   int     `json:"api_rate" gorm:"default:8000"`  // 每分钟8000次请求
 	Public    bool    `json:"public" form:"public" gorm:"default:false"`       // 是否为公开分组，如果是，则可以被用户在令牌中选择
 	Promotion bool    `json:"promotion" form:"promotion" gorm:"default:false"` // 是否是自动升级用户组， 如果是则用户充值金额满足条件自动升级
 	Min       int     `json:"min" form:"min" gorm:"default:0"`                 // 晋级条件最小值
