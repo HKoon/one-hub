@@ -844,6 +844,7 @@
           "placeholder": "Log Cleanup Time"
         },
         "logConsume": "Enable Log Consumption",
+        "logOriginalModel": "Show Original Model Name in Logs",
         "title": "Log Settings"
       },
       "monitoringSettings": {

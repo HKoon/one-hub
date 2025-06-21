@@ -143,6 +143,7 @@ var EmailDomainWhitelist = []string{
 var MemoryCacheEnabled = false
 
 var LogConsumeEnabled = true
+var LogOriginalModelEnabled = false
 
 var SMTPServer = ""
 var SMTPPort = 587

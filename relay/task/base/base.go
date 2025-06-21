@@ -3,6 +3,7 @@ package base
 import (
 	"context"
 	"errors"
+	"one-api/common/config"
 	"one-api/model"
 	"one-api/providers/base"
 	"one-api/relay"
@@ -52,7 +53,7 @@ func (t *TaskBase) InitTask() {
 
 func (t *TaskBase) GetModelName() string {
 	billingOriginalModel := t.C.GetBool("billing_original_model")
-	if billingOriginalModel {
+	if billingOriginalModel || config.LogOriginalModelEnabled {
 		return t.OriginalModel
 	}
 	return t.ModelName

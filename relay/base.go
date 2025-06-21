@@ -2,6 +2,7 @@ package relay
 
 import (
 	"encoding/json"
+	"one-api/common/config"
 	"one-api/model"
 	"one-api/relay/relay_util"
 	"one-api/types"
@@ -94,7 +95,7 @@ func (r *relayBase) getOriginalModel() string {
 func (r *relayBase) getModelName() string {
 	billingOriginalModel := r.c.GetBool("billing_original_model")
 
-	if billingOriginalModel {
+	if billingOriginalModel || config.LogOriginalModelEnabled {
 		return r.originalModel
 	}
 	return r.modelName

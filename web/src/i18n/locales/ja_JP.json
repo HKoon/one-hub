@@ -832,6 +832,7 @@
           "placeholder": "ログクリーニング時間"
         },
         "logConsume": "ログ消費を有効にする",
+        "logOriginalModel": "ログに元のモデル名を表示",
         "title": "ログ設定"
       },
       "monitoringSettings": {

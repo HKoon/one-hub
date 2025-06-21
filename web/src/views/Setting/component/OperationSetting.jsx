@@ -45,6 +45,7 @@ const OperationSetting = () => {
     AutomaticEnableChannelEnabled: '',
     ChannelDisableThreshold: 0,
     LogConsumeEnabled: '',
+    LogOriginalModelEnabled: '',
     DisplayInCurrencyEnabled: '',
     ApproximateTokenEnabled: '',
     RetryTimes: 0,
@@ -579,6 +580,10 @@ const OperationSetting = () => {
           <FormControlLabel
             label={t('setting_index.operationSettings.logSettings.logConsume')}
             control={<Checkbox checked={inputs.LogConsumeEnabled === 'true'} onChange={handleInputChange} name="LogConsumeEnabled" />}
+          />
+          <FormControlLabel
+            label={t('setting_index.operationSettings.logSettings.logOriginalModel')}
+            control={<Checkbox checked={inputs.LogOriginalModelEnabled === 'true'} onChange={handleInputChange} name="LogOriginalModelEnabled" />}
           />
           <FormControl>
             <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={'zh-cn'}>

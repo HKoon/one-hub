@@ -732,6 +732,7 @@
       "logSettings": {
         "title": "日志设置",
         "logConsume": "启用日志消费",
+        "logOriginalModel": "日志显示映射前模型名称",
         "logCleanupTime": {
           "label": "日志清理时间",
           "placeholder": "日志清理时间"

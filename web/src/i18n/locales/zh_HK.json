@@ -833,6 +833,7 @@
           "placeholder": "日誌清理時間"
         },
         "logConsume": "啟用日誌消費",
+        "logOriginalModel": "日誌顯示映射前模型名稱",
         "title": "日誌設置"
       },
       "monitoringSettings": {
