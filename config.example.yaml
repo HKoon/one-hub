@@ -51,13 +51,8 @@ channel:
   test_frequency: 0 # 设置之后将定期检查渠道，单位为分钟，未设置则不进行检查
 
 # 连接设置
-relay_timeout: 150 # 中继请求超时时间，单位为秒，默认为 150。设置为0表示无超时限制。
+relay_timeout: 0 # 中继请求超时时间，单位为秒，默认为 0。
 connect_timeout: 5 # 连接超时时间，单位为秒，默认为 5。
-# 高并发配置（可选）
-max_idle_conns: 200 # 全局最大空闲连接数，默认为 200
-max_idle_conns_per_host: 50 # 每个主机最大空闲连接数，默认为 50
-max_conns_per_host: 100 # 每个主机最大连接数，默认为 100
-idle_conn_timeout: 300 # 空闲连接超时时间，单位为秒，默认为 300（5分钟）
 
 # 默认程序启动时会联网下载一些通用的Token的编码，如：gpt-3.5-turbo，在一些网络环境不稳定，或者离线情况，可能会导致启动有问题，可以配置此目录缓存数据，可迁移到离线环境。
 tiktoken_cache_dir: ""
