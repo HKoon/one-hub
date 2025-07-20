@@ -71,6 +71,8 @@ type OpenAIResponsesRequest struct {
 	Tools              []ResponsesTools              `json:"tools,omitempty"`
 	TopP               *float64                      `json:"top_p,omitempty"`
 	Truncation         string                        `json:"truncation,omitempty"`
+
+	ConvertChat bool `json:"-"`
 }
 
 func (r *OpenAIResponsesRequest) ToChatCompletionRequest() (*ChatCompletionRequest, error) {
@@ -409,15 +411,15 @@ type ResponsesTools struct {
 	// Code interpreter
 	Container any `json:"container,omitempty"`
 	// Image generation tool
-	// Background      any `json:"background,omitempty"`
-	// InputImageMask  any `json:"input_image_mask,omitempty"`
-	// Model           string `json:"model,omitempty"`
-	// Moderation      any `json:"moderation,omitempty"`
-	// OutputCompression any `json:"output_compression,omitempty"`
-	// OutputFormat      any `json:"output_format,omitempty"`
-	// PartialImages     any `json:"partial_images,omitempty"`
-	// Quality           any `json:"quality,omitempty"`
-	// Size              any `json:"size,omitempty"`
+	Background        any    `json:"background,omitempty"`
+	InputImageMask    any    `json:"input_image_mask,omitempty"`
+	Model             string `json:"model,omitempty"`
+	Moderation        any    `json:"moderation,omitempty"`
+	OutputCompression any    `json:"output_compression,omitempty"`
+	OutputFormat      any    `json:"output_format,omitempty"`
+	PartialImages     any    `json:"partial_images,omitempty"`
+	Quality           string `json:"quality,omitempty"`
+	Size              string `json:"size,omitempty"`
 }
 
 type ReasoningEffort struct {
@@ -493,6 +495,20 @@ func (m ResponsesOutput) StringContent() string {
 	return ""
 }
 
+func (m ResponsesOutput) GetSummaryString() string {
+	if m.Type != InputTypeReasoning {
+		return ""
+	}
+
+	summary := ""
+	for _, item := range m.Summary {
+		if item.Type == ContentTypeSummaryText {
+			summary += item.Text
+		}
+	}
+	return summary
+}
+
 type IncompleteDetail struct {
 	Reason string `json:"reason,omitempty"`
 }
@@ -512,6 +528,23 @@ type ResponsesOutput struct {
 	Action              any                `json:"action,omitempty"`
 	PendingSafetyChecks any                `json:"pending_safety_checks,omitempty"`
 	Summary             []SummaryResponses `json:"summary,omitempty"`
+
+	EncryptedContent *string `json:"encrypted_content,omitempty"`
+
+	Code        any    `json:"code,omitempty"`
+	ContainerID string `json:"container_id,omitempty"`
+	Outputs     any    `json:"outputs,omitempty"`
+	ServerLabel any    `json:"server_label,omitempty"`
+	Error       any    `json:"error,omitempty"`
+	Output      any    `json:"output,omitempty"` // The output of the tool call.
+	Tools       any    `json:"tools,omitempty"`  // The tools available for the tool call.
+
+	Background    any    `json:"background,omitempty"`
+	OutputFormat  any    `json:"output_format,omitempty"`
+	Quality       string `json:"quality,omitempty"`
+	Result        any    `json:"result,omitempty"`         // The result of the image generation call.
+	Size          string `json:"size,omitempty"`           // The size of the image to be generated.
+	RevisedPrompt any    `json:"revised_prompt,omitempty"` // The revised prompt for the image generation call.
 }
 
 type ResponsesOutputToolCall struct {
@@ -629,16 +662,16 @@ func (u *Usage) ToResponsesUsage() *ResponsesUsage {
 	return responsesUsage
 }
 
-// func convertResponsesStatusToChat(status string) string {
-// 	switch status {
-// 	case ResponseStatusFailed:
-// 		return FinishReasonContentFilter
-// 	case ResponseStatusIncomplete:
-// 		return FinishReasonLength
-// 	default:
-// 		return FinishReasonStop
-// 	}
-// }
+func ConvertResponsesStatusToChat(status string) string {
+	switch status {
+	case ResponseStatusFailed:
+		return FinishReasonContentFilter
+	case ResponseStatusIncomplete:
+		return FinishReasonLength
+	default:
+		return FinishReasonStop
+	}
+}
 
 func ConvertChatStatusToResponses(status string) string {
 	switch status {
@@ -753,4 +786,57 @@ func (cc *ChatCompletionResponse) ToResponses(request *OpenAIResponsesRequest) *
 	res.Output = outputs
 
 	return res
+}
+
+func (r *OpenAIResponsesResponses) ToChat() *ChatCompletionResponse {
+	resp := &ChatCompletionResponse{
+		Created: r.CreatedAt,
+		ID:      r.ID,
+		Model:   r.Model,
+		Object:  "chat.completion",
+		Usage:   r.Usage.ToOpenAIUsage(),
+		Choices: make([]ChatCompletionChoice, 0),
+	}
+
+	choice := ChatCompletionChoice{
+		Message: ChatCompletionMessage{
+			Role: ChatMessageRoleAssistant,
+		},
+		FinishReason: FinishReasonStop,
+	}
+
+	for _, output := range r.Output {
+		switch output.Type {
+		case InputTypeMessage:
+			choice.Message.Content = output.StringContent()
+		case InputTypeReasoning:
+			choice.Message.ReasoningContent = output.GetSummaryString()
+		case InputTypeFunctionCall:
+			if choice.Message.ToolCalls == nil {
+				choice.Message.ToolCalls = make([]*ChatCompletionToolCalls, 0)
+			}
+			arguments := ""
+			if output.Arguments != nil {
+				arguments = *output.Arguments
+			}
+			choice.Message.ToolCalls = append(choice.Message.ToolCalls, &ChatCompletionToolCalls{
+				Id:   output.CallID,
+				Type: "function",
+				Function: &ChatCompletionToolCallsFunction{
+					Name:      output.Name,
+					Arguments: arguments,
+				},
+			})
+			choice.FinishReason = FinishReasonToolCalls
+		}
+
+		if output.Status == ResponseStatusFailed || output.Status == ResponseStatusIncomplete {
+			choice.FinishReason = ConvertResponsesStatusToChat(output.Status)
+		}
+
+	}
+
+	resp.Choices = append(resp.Choices, choice)
+
+	return resp
 }

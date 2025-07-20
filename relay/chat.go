@@ -99,7 +99,26 @@ func (r *relayChat) filterThinkTagsFromResponse(response *types.ChatCompletionRe
 	}
 }
 
+var need2Response = map[string]bool{
+	"o3-pro-2025-06-10":                true,
+	"o3-pro":                           true,
+	"o1-pro-2025-03-19":                true,
+	"o1-pro":                           true,
+	"o3-deep-research-2025-06-26":      true,
+	"o3-deep-research":                 true,
+	"o4-mini-deep-research-2025-06-26": true,
+	"o4-mini-deep-research":            true,
+	"codex-mini-latest":                true,
+}
+
 func (r *relayChat) send() (err *types.OpenAIErrorWithStatusCode, done bool) {
+	if need2Response[r.modelName] {
+		resProvider, ok := r.provider.(providersBase.ResponsesInterface)
+		if ok {
+			return r.compatibleSend(resProvider)
+		}
+	}
+
 	chatProvider, ok := r.provider.(providersBase.ChatInterface)
 	if !ok {
 		err = common.StringErrorWrapperLocal("channel not implemented", "channel_error", http.StatusServiceUnavailable)
@@ -186,4 +205,46 @@ func (r *relayChat) getUsageResponse() string {
 	}
 
 	return ""
+}
+
+func (r *relayChat) compatibleSend(resProvider providersBase.ResponsesInterface) (err *types.OpenAIErrorWithStatusCode, done bool) {
+	resRequest := r.chatRequest.ToResponsesRequest()
+	resRequest.ConvertChat = true
+
+	if r.chatRequest.Stream {
+		var response requester.StreamReaderInterface[string]
+		response, err = resProvider.CreateResponsesStream(resRequest)
+		if err != nil {
+			return
+		}
+
+		if r.heartbeat != nil {
+			r.heartbeat.Stop()
+		}
+
+		doneStr := func() string {
+			return r.getUsageResponse()
+		}
+
+		var firstResponseTime time.Time
+		firstResponseTime, err = responseStreamClient(r.c, response, doneStr)
+		r.SetFirstResponseTime(firstResponseTime)
+	} else {
+		var response *types.OpenAIResponsesResponses
+		response, err = resProvider.CreateResponses(resRequest)
+		if err != nil {
+			return
+		}
+
+		if r.heartbeat != nil {
+			r.heartbeat.Stop()
+		}
+		err = responseJsonClient(r.c, response.ToChat())
+	}
+
+	if err != nil {
+		done = true
+	}
+
+	return
 }
