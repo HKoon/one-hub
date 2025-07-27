@@ -55,6 +55,11 @@ func NewQuota(c *gin.Context, modelName string, promptTokens int) *Quota {
 }
 
 func (q *Quota) PreQuotaConsumption() *types.OpenAIErrorWithStatusCode {
+	// 如果禁用额度检查，直接返回nil
+	if config.DisableQuotaCheck {
+		return nil
+	}
+	
 	if q.price.Type == model.TimesPriceType {
 		q.preConsumedQuota = int(1000 * q.inputRatio)
 	} else if q.price.Input != 0 || q.price.Output != 0 {
@@ -74,10 +79,7 @@ func (q *Quota) PreQuotaConsumption() *types.OpenAIErrorWithStatusCode {
 		return common.ErrorWrapper(errors.New("user quota is not enough"), "insufficient_user_quota", http.StatusPaymentRequired)
 	}
 
-	err = model.CacheDecreaseUserQuota(q.userId, q.preConsumedQuota)
-	if err != nil {
-		return common.ErrorWrapper(err, "decrease_user_quota_failed", http.StatusInternalServerError)
-	}
+
 
 	if userQuota > 100*q.preConsumedQuota {
 		// in this case, we do not pre-consume quota
@@ -87,9 +89,15 @@ func (q *Quota) PreQuotaConsumption() *types.OpenAIErrorWithStatusCode {
 	}
 
 	if q.preConsumedQuota > 0 {
-		err := model.PreConsumeTokenQuota(q.tokenId, q.preConsumedQuota)
-		if err != nil {
-			return common.ErrorWrapper(err, "pre_consume_token_quota_failed", http.StatusForbidden)
+		if config.BatchUpdateEnabled {
+			// 使用现有的批量更新系统进行预扣除
+			model.AddNewRecord(model.BatchUpdateTypeUserQuota, q.userId, -q.preConsumedQuota)
+			model.AddNewRecord(model.BatchUpdateTypeTokenQuota, q.tokenId, -q.preConsumedQuota)
+		} else {
+			err := model.PreConsumeTokenQuota(q.tokenId, q.preConsumedQuota)
+			if err != nil {
+				return common.ErrorWrapper(err, "pre_consume_token_quota_failed", http.StatusForbidden)
+			}
 		}
 		q.HandelStatus = true
 	}
@@ -136,40 +144,71 @@ func (q *Quota) completedQuotaConsumption(usage *types.Usage, tokenName string, 
 
 	quota := q.GetTotalQuotaByUsage(usage)
 
+	// 如果禁用额度检查，只记录日志，不扣减额度
+	if config.DisableQuotaCheck {
+		if !config.BatchUpdateEnabled {
+			model.RecordConsumeLog(
+				ctx,
+				q.userId,
+				q.channelId,
+				usage.PromptTokens,
+				usage.CompletionTokens,
+				q.modelName,
+				tokenName,
+				quota,
+				"",
+				q.getRequestTime(),
+				isStream,
+				q.GetLogMeta(usage),
+				sourceIp,
+			)
+		}
+		return nil
+	}
+
 	if quota > 0 {
 		quotaDelta := quota - q.preConsumedQuota
 		err := model.PostConsumeTokenQuota(q.tokenId, quotaDelta)
 		if err != nil {
 			return errors.New("error consuming token remain quota: " + err.Error())
 		}
-		err = model.CacheUpdateUserQuota(q.userId)
-		if err != nil {
-			return errors.New("error consuming token remain quota: " + err.Error())
+		if !config.BatchUpdateEnabled {
+			err = model.CacheUpdateUserQuota(q.userId)
+			if err != nil {
+				return errors.New("error consuming token remain quota: " + err.Error())
+			}
 		}
 		model.UpdateChannelUsedQuota(q.channelId, quota)
 	}
 
-	model.RecordConsumeLog(
-		ctx,
-		q.userId,
-		q.channelId,
-		usage.PromptTokens,
-		usage.CompletionTokens,
-		q.modelName,
-		tokenName,
-		quota,
-		"",
-		q.getRequestTime(),
-		isStream,
-		q.GetLogMeta(usage),
-		sourceIp,
-	)
-	model.UpdateUserUsedQuotaAndRequestCount(q.userId, quota)
+	if !config.BatchUpdateEnabled {
+		model.RecordConsumeLog(
+			ctx,
+			q.userId,
+			q.channelId,
+			usage.PromptTokens,
+			usage.CompletionTokens,
+			q.modelName,
+			tokenName,
+			quota,
+			"",
+			q.getRequestTime(),
+			isStream,
+			q.GetLogMeta(usage),
+			sourceIp,
+		)
+		model.UpdateUserUsedQuotaAndRequestCount(q.userId, quota)
+	}
 
 	return nil
 }
 
 func (q *Quota) Undo(c *gin.Context) {
+	// 如果禁用额度检查，不需要撤销预扣费
+	if config.DisableQuotaCheck {
+		return
+	}
+	
 	tokenId := c.GetInt("token_id")
 	if q.HandelStatus {
 		go func(ctx context.Context) {

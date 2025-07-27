@@ -360,7 +360,7 @@ func UpdateChannelStatusById(id int, status int) {
 
 func UpdateChannelUsedQuota(id int, quota int) {
 	if config.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeChannelUsedQuota, id, quota)
+		AddNewRecord(BatchUpdateTypeChannelUsedQuota, id, quota)
 		return
 	}
 	updateChannelUsedQuota(id, quota)

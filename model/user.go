@@ -434,7 +434,7 @@ func IncreaseUserQuota(id int, quota int) (err error) {
 		return errors.New("quota 不能为负数！")
 	}
 	if config.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeUserQuota, id, quota)
+		AddNewRecord(BatchUpdateTypeUserQuota, id, quota)
 		return nil
 	}
 	return increaseUserQuota(id, quota)
@@ -450,7 +450,7 @@ func DecreaseUserQuota(id int, quota int) (err error) {
 		return errors.New("quota 不能为负数！")
 	}
 	if config.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeUserQuota, id, -quota)
+		AddNewRecord(BatchUpdateTypeUserQuota, id, -quota)
 		return nil
 	}
 	return decreaseUserQuota(id, quota)
@@ -468,8 +468,8 @@ func GetRootUserEmail() (email string) {
 
 func UpdateUserUsedQuotaAndRequestCount(id int, quota int) {
 	if config.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeUsedQuota, id, quota)
-		addNewRecord(BatchUpdateTypeRequestCount, id, 1)
+		AddNewRecord(BatchUpdateTypeUsedQuota, id, quota)
+		AddNewRecord(BatchUpdateTypeRequestCount, id, 1)
 		return
 	}
 	updateUserUsedQuotaAndRequestCount(id, quota, 1)

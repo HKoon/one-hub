@@ -37,6 +37,8 @@ func defaultConfig() {
 	viper.SetDefault("sqlite_busy_timeout", 3000)
 	viper.SetDefault("sync_frequency", 600)
 	viper.SetDefault("batch_update_interval", 5)
+	viper.SetDefault("batch_update_enabled", false)
+	viper.SetDefault("disable_quota_check", true)
 	viper.SetDefault("global.api_rate_limit", 10000)
 	viper.SetDefault("global.web_rate_limit", 3000)
 	viper.SetDefault("connect_timeout", 5)

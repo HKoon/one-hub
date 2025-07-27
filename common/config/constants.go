@@ -201,6 +201,7 @@ var RequestInterval time.Duration
 
 var BatchUpdateEnabled = false
 var BatchUpdateInterval = 5
+var DisableQuotaCheck = false
 
 var MCP_ENABLE = false
 

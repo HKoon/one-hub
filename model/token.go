@@ -258,7 +258,7 @@ func IncreaseTokenQuota(id int, quota int) (err error) {
 		return errors.New("quota 不能为负数！")
 	}
 	if config.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, id, quota)
+		AddNewRecord(BatchUpdateTypeTokenQuota, id, quota)
 		return nil
 	}
 	return increaseTokenQuota(id, quota)
@@ -280,7 +280,7 @@ func DecreaseTokenQuota(id int, quota int) (err error) {
 		return errors.New("quota 不能为负数！")
 	}
 	if config.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, id, -quota)
+		AddNewRecord(BatchUpdateTypeTokenQuota, id, -quota)
 		return nil
 	}
 	return decreaseTokenQuota(id, quota)
@@ -320,14 +320,23 @@ func PreConsumeTokenQuota(tokenId int, quota int) (err error) {
 	if quotaTooLow || noMoreQuota {
 		go sendQuotaWarningEmail(token.UserId, userQuota, noMoreQuota)
 	}
-	if !token.UnlimitedQuota {
-		err = DecreaseTokenQuota(tokenId, quota)
-		if err != nil {
-			return err
+
+	if config.BatchUpdateEnabled {
+		AddNewRecord(BatchUpdateTypeUserQuota, token.UserId, -quota)
+		if !token.UnlimitedQuota {
+			AddNewRecord(BatchUpdateTypeTokenQuota, tokenId, -quota)
 		}
+		return nil
+	} else {
+		if !token.UnlimitedQuota {
+			err = DecreaseTokenQuota(tokenId, quota)
+			if err != nil {
+				return err
+			}
+		}
+		err = DecreaseUserQuota(token.UserId, quota)
+		return err
 	}
-	err = DecreaseUserQuota(token.UserId, quota)
-	return err
 }
 
 func sendQuotaWarningEmail(userId int, userQuota int, noMoreQuota bool) {
@@ -363,23 +372,39 @@ func PostConsumeTokenQuota(tokenId int, quota int) (err error) {
 	if err != nil {
 		return err
 	}
-	if quota > 0 {
-		err = DecreaseUserQuota(token.UserId, quota)
-	} else {
-		err = IncreaseUserQuota(token.UserId, -quota)
-	}
-	if err != nil {
-		return err
-	}
-	if !token.UnlimitedQuota {
+
+	if config.BatchUpdateEnabled {
 		if quota > 0 {
-			err = DecreaseTokenQuota(tokenId, quota)
+			AddNewRecord(BatchUpdateTypeUserQuota, token.UserId, -quota)
+			if !token.UnlimitedQuota {
+				AddNewRecord(BatchUpdateTypeTokenQuota, tokenId, -quota)
+			}
 		} else {
-			err = IncreaseTokenQuota(tokenId, -quota)
+			AddNewRecord(BatchUpdateTypeUserQuota, token.UserId, -quota)
+			if !token.UnlimitedQuota {
+				AddNewRecord(BatchUpdateTypeTokenQuota, tokenId, -quota)
+			}
+		}
+		return nil
+	} else {
+		if quota > 0 {
+			err = DecreaseUserQuota(token.UserId, quota)
+		} else {
+			err = IncreaseUserQuota(token.UserId, -quota)
 		}
 		if err != nil {
 			return err
 		}
+		if !token.UnlimitedQuota {
+			if quota > 0 {
+				err = DecreaseTokenQuota(tokenId, quota)
+			} else {
+				err = IncreaseTokenQuota(tokenId, -quota)
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	}
-	return nil
 }

@@ -37,7 +37,7 @@ func InitBatchUpdater() {
 	}()
 }
 
-func addNewRecord(type_ int, id int, value int) {
+func AddNewRecord(type_ int, id int, value int) {
 	batchUpdateLocks[type_].Lock()
 	defer batchUpdateLocks[type_].Unlock()
 	if _, ok := batchUpdateStores[type_][id]; !ok {
@@ -70,7 +70,7 @@ func batchUpdate() {
 			case BatchUpdateTypeUsedQuota:
 				updateUserUsedQuota(key, value)
 			case BatchUpdateTypeRequestCount:
-				updateUserRequestCount(key, value)
+				updateUserRequestCount(key, 1)
 			case BatchUpdateTypeChannelUsedQuota:
 				updateChannelUsedQuota(key, value)
 			}

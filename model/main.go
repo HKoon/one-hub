@@ -36,6 +36,11 @@ func SetupDB() {
 		logger.SysLog("batch update enabled with interval " + strconv.Itoa(config.BatchUpdateInterval) + "s")
 		InitBatchUpdater()
 	}
+	
+	if viper.GetBool("disable_quota_check") {
+		config.DisableQuotaCheck = true
+		logger.SysLog("quota check disabled for internal use")
+	}
 }
 
 func createRootAccountIfNeed() error {
