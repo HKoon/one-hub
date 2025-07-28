@@ -86,7 +86,6 @@ func (r *HTTPRequester) SendRequest(req *http.Request, response any, outputResp 
 		if !strings.Contains(err.Error(), "connection reset by peer") {
 			return nil, common.ErrorWrapper(err, "http_request_failed", http.StatusInternalServerError)
 		}
-		common.SysLog(fmt.Sprintf("Connection reset, retrying %d/%d", attempt+1, maxRetries))
 		time.Sleep(time.Second * time.Duration(attempt+1))
 	}
 	if err != nil {
