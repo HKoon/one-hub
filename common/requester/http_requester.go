@@ -13,6 +13,7 @@ import (
 	"one-api/types"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -74,7 +75,20 @@ func (r *HTTPRequester) NewRequest(method, url string, setters ...requestOption)
 
 // 发送请求
 func (r *HTTPRequester) SendRequest(req *http.Request, response any, outputResp bool) (*http.Response, *types.OpenAIErrorWithStatusCode) {
-	resp, err := HTTPClient.Do(req)
+	const maxRetries = 3
+	var resp *http.Response
+	var err error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		resp, err = HTTPClient.Do(req)
+		if err == nil {
+			break
+		}
+		if !strings.Contains(err.Error(), "connection reset by peer") {
+			return nil, common.ErrorWrapper(err, "http_request_failed", http.StatusInternalServerError)
+		}
+		common.SysLog(fmt.Sprintf("Connection reset, retrying %d/%d", attempt+1, maxRetries))
+		time.Sleep(time.Second * time.Duration(attempt+1))
+	}
 	if err != nil {
 		return nil, common.ErrorWrapper(err, "http_request_failed", http.StatusInternalServerError)
 	}
