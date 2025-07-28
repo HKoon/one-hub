@@ -75,19 +75,7 @@ func (r *HTTPRequester) NewRequest(method, url string, setters ...requestOption)
 
 // 发送请求
 func (r *HTTPRequester) SendRequest(req *http.Request, response any, outputResp bool) (*http.Response, *types.OpenAIErrorWithStatusCode) {
-	const maxRetries = 3
-	var resp *http.Response
-	var err error
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		resp, err = HTTPClient.Do(req)
-		if err == nil {
-			break
-		}
-		if !strings.Contains(err.Error(), "connection reset by peer") {
-			return nil, common.ErrorWrapper(err, "http_request_failed", http.StatusInternalServerError)
-		}
-		time.Sleep(time.Second * time.Duration(attempt+1))
-	}
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return nil, common.ErrorWrapper(err, "http_request_failed", http.StatusInternalServerError)
 	}

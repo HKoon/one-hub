@@ -141,7 +141,18 @@ func initHttpServer() {
 	router.SetRouter(server, buildFS, indexPage)
 	port := viper.GetString("port")
 
-	err := server.Run(":" + port)
+	// 创建自定义的HTTP服务器，设置超时参数
+	httpServer := &http.Server{
+		Addr:           ":" + port,
+		Handler:        server,
+		ReadTimeout:    180 * time.Second, // 读取超时 - 3分钟
+		WriteTimeout:   180 * time.Second, // 写入超时 - 3分钟
+		IdleTimeout:    300 * time.Second, // 空闲连接超时 - 5分钟
+		MaxHeaderBytes: 1 << 20,           // 1MB
+	}
+
+	logger.SysLog(fmt.Sprintf("HTTP server starting on port %s with timeouts configured", port))
+	err := httpServer.ListenAndServe()
 	if err != nil {
 		logger.FatalLog("failed to start HTTP server: " + err.Error())
 	}
