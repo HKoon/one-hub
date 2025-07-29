@@ -9,10 +9,6 @@ import (
 var HTTPClient *http.Client
 
 func InitHttpClient() {
-	// 获取配置参数
-	connectTimeout := utils.GetOrDefault("connect_timeout", 5)
-	relayTimeout := utils.GetOrDefault("relay_timeout", 0)
-	
 	trans := &http.Transport{
 		DialContext: utils.Socks5ProxyFunc,
 		Proxy:       utils.ProxyFunc,
@@ -24,9 +20,8 @@ func InitHttpClient() {
 		IdleConnTimeout:     90 * time.Second, // 空闲连接超时时间
 		
 		// 超时配置
-		DialTimeout:           time.Duration(connectTimeout) * time.Second, // 连接超时
 		TLSHandshakeTimeout:   10 * time.Second,                           // TLS握手超时
-		ResponseHeaderTimeout: 180 * time.Second,                          // 响应头超时
+		ResponseHeaderTimeout: 180 * time.Second,                          // 响应头超时 - 关键配置
 		ExpectContinueTimeout: 1 * time.Second,                            // Expect: 100-continue超时
 		
 		// 保持连接活跃
@@ -40,7 +35,7 @@ func InitHttpClient() {
 		Transport: trans,
 	}
 
-	// 设置总体请求超时
+	relayTimeout := utils.GetOrDefault("relay_timeout", 0)
 	if relayTimeout > 0 {
 		HTTPClient.Timeout = time.Duration(relayTimeout) * time.Second
 	} else {
