@@ -10,12 +10,61 @@ services:
     volumes:
       - ./data:/data
     environment:
-      - SQL_DSN=oneapi:123456@tcp(db:3306)/one-api # 修改此行，或注释掉以使用 SQLite 作为数据库
-      - REDIS_CONN_STRING=redis://redis # redis
-      - SESSION_SECRET=random_string # 修改为随机字符串
-      - USER_TOKEN_SECRET=random_string # 修改为随机字符串,32位以上
+      # 基础服务配置
+      - PORT=3000
+      - LANGUAGE=en_US
+      - LOG_LEVEL=info
+      - GIN_MODE=release
       - TZ=Asia/Shanghai
-      # - HASHIDS_SALT=random_string # 可空，建议设置，字符串元素不能重复
+      
+      # 数据库连接配置
+      - SQL_DSN=${{MySQL.MYSQLUSER}}:${{MySQL.MYSQLPASSWORD}}@tcp(db:3306)/${{MySQL.MYSQLDATABASE}}
+      - REDIS_CONN_STRING=${{Redis.REDIS_URL}}
+      
+      # 数据库连接池优化（针对1000用户高并发）
+      - SQL_MAX_IDLE_CONNS=200
+      - SQL_MAX_OPEN_CONNS=500
+      - SQL_CONN_MAX_LIFETIME=60
+      
+      # 用户Token密钥
+      - SESSION_SECRET=random_string # 修改为随机字符串
+      - USER_TOKEN_SECRET=38947a137ab9cd1fa204dac59670b191c3a58a79c5368cf33089546291f72fc1
+      - HASHIDS_SALT=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+      
+      # 全局速率限制（针对高并发调整）
+      - GLOBAL_API_RATE_LIMIT=50000
+      - GLOBAL_WEB_RATE_LIMIT=15000
+      
+      # 连接超时配置（针对2分钟长请求优化）
+      - CONNECT_TIMEOUT=30
+      - RELAY_TIMEOUT=180
+      
+      # 批量更新配置（高并发优化）
+      - BATCH_UPDATE_ENABLED=true
+      - BATCH_UPDATE_INTERVAL=3
+      
+      # 内存缓存配置（减少数据库查询压力）
+      - MEMORY_CACHE_ENABLED=true
+      - SYNC_FREQUENCY=180
+      
+      # 功能开关（生产环境建议）
+      - DISABLE_QUOTA_CHECK=false
+      
+      # 频道更新设置
+      - CHANNEL_UPDATE_FREQUENCY=1440
+      - CHANNEL_TEST_FREQUENCY=1440
+      - POLLING_INTERVAL=5
+      
+      # 自动价格更新
+      - AUTO_PRICE_UPDATES=false
+      - AUTO_PRICE_UPDATES_MODE=system
+      - AUTO_PRICE_UPDATES_INTERVAL=1440
+      
+      # 其他设置
+      - NODE_TYPE=master
+      - FRONTEND_BASE_URL=
+      - SQLITE_BUSY_TIMEOUT=3000
+      - USER_INVOICE_MONTH=false
     #      - NODE_TYPE=slave  # 多机部署时从节点取消注释该行
     #      - SYNC_FREQUENCY=60  # 需要定期从数据库加载数据时取消注释该行
     #      - FRONTEND_BASE_URL=https://openai.justsong.cn  # 多机部署时从节点取消注释该行
