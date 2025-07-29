@@ -26,7 +26,7 @@ func InitHttpClient() {
 		// 超时配置
 		DialTimeout:           time.Duration(connectTimeout) * time.Second, // 连接超时
 		TLSHandshakeTimeout:   10 * time.Second,                           // TLS握手超时
-		ResponseHeaderTimeout: 30 * time.Second,                           // 响应头超时
+		ResponseHeaderTimeout: 180 * time.Second,                          // 响应头超时
 		ExpectContinueTimeout: 1 * time.Second,                            // Expect: 100-continue超时
 		
 		// 保持连接活跃

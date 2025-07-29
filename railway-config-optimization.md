@@ -13,35 +13,29 @@
 - 超时配置（DialTimeout, TLSHandshakeTimeout等）
 - HTTP/2支持和Keep-Alive优化
 
-## Railway 环境变量配置建议
+### 2. Railway 环境变量配置（关键）
 
-在Railway项目中设置以下环境变量：
+在 Railway 的 `Variables` 中添加以下环境变量。对于耗时长的模型（如2分钟），超时相关的配置尤为重要。
 
 ```bash
-# 连接超时配置
-CONNECT_TIMEOUT=10
-RELAY_TIMEOUT=300
+# 连接与中继超时 (单位: 秒)
+CONNECT_TIMEOUT=10      # 连接超时，适当增加以应对网络波动
+RELAY_TIMEOUT=0         # 中继超时，0表示不限制，交由具体实现控制，对于长任务是必要的
 
-# 数据库连接池配置
-SQL_MAX_IDLE_CONNS=50
+# 重试策略 (针对长耗时任务优化)
+RETRY_TIMES=3           # 失败后重试3次
+RETRY_TIME_OUT=600      # 重试总超时（秒）。必须大于 (单次请求最长时间 * (重试次数 + 1))。例如: 120s * 4 = 480s，设置为600s提供足够缓冲。
+RETRY_COOLDOWN_SECONDS=10 # 渠道失败后冻结10秒
+
+# 数据库连接池
+SQL_MAX_IDLE_CONNS=20
 SQL_MAX_OPEN_CONNS=100
+SQL_MAX_LIFETIME=600
 
-# Redis配置优化
-REDIS_CONN_STRING=redis://default:password@host:port/0
-
-# 日志级别（用于调试）
-LOG_LEVEL=info
-
-# Gin模式
-GIN_MODE=release
-
-# 批量更新配置（减少数据库压力）
-BATCH_UPDATE_ENABLED=true
-BATCH_UPDATE_INTERVAL=5
-
-# 内存缓存（减少数据库查询）
-MEMORY_CACHE_ENABLED=true
-SYNC_FREQUENCY=300
+# Redis 连接池
+REDIS_MAX_IDLE_CONNS=20
+REDIS_MAX_ACTIVE_CONNS=100
+REDIS_IDLE_TIMEOUT=600
 ```
 
 ## Railway 部署优化建议
