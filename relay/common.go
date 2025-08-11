@@ -391,8 +391,21 @@ func shouldRetry(c *gin.Context, apiErr *types.OpenAIErrorWithStatusCode, channe
 
 	metrics.RecordProvider(c, apiErr.StatusCode)
 
-	if apiErr.LocalError ||
-		(channelId > 0 && !ignore) {
+	// 检查是否为网络连接错误，这类错误即使是LocalError也应该重试
+	isNetworkError := strings.Contains(apiErr.Message, "请求上游地址失败") ||
+					 strings.Contains(apiErr.Message, "connection reset by peer") ||
+					 strings.Contains(apiErr.Message, "connection refused") ||
+					 strings.Contains(apiErr.Message, "timeout") ||
+					 strings.Contains(apiErr.Message, "EOF") ||
+					 strings.Contains(apiErr.Message, "broken pipe")
+
+	// 对于非网络错误的LocalError，不重试
+	if apiErr.LocalError && !isNetworkError {
+		return false
+	}
+
+	// 指定渠道时不重试（除非是网络错误）
+	if (channelId > 0 && !ignore) && !isNetworkError {
 		return false
 	}
 
@@ -400,9 +413,13 @@ func shouldRetry(c *gin.Context, apiErr *types.OpenAIErrorWithStatusCode, channe
 	case http.StatusTooManyRequests, http.StatusTemporaryRedirect:
 		return true
 	case http.StatusRequestTimeout, http.StatusGatewayTimeout, 524:
-		return false
+		// 对于超时错误，如果是网络连接问题则重试
+		return isNetworkError
 	case http.StatusBadRequest:
 		return shouldRetryBadRequest(channelType, apiErr)
+	case http.StatusInternalServerError:
+		// 500错误通常表示网络连接问题，应该重试
+		return true
 	}
 
 	if apiErr.StatusCode/100 == 5 {
