@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"one-api/common"
@@ -23,6 +24,65 @@ import (
 type relayChat struct {
 	relayBase
 	chatRequest types.ChatCompletionRequest
+	thinkTagFilter *thinkTagStreamFilter
+}
+
+// thinkTagStreamFilter 用于过滤流式输出中的think标签
+type thinkTagStreamFilter struct {
+	buffer     strings.Builder
+	inThinkTag bool
+	tagDepth   int
+}
+
+// newThinkTagStreamFilter 创建新的think标签过滤器
+func newThinkTagStreamFilter() *thinkTagStreamFilter {
+	return &thinkTagStreamFilter{
+		buffer:     strings.Builder{},
+		inThinkTag: false,
+		tagDepth:   0,
+	}
+}
+
+// Filter 过滤流式数据中的think标签
+func (f *thinkTagStreamFilter) Filter(data string) string {
+	f.buffer.WriteString(data)
+	content := f.buffer.String()
+	
+	// 使用正则表达式处理think标签
+	for {
+		if !f.inThinkTag {
+			// 查找开始标签
+			openIndex := strings.Index(content, "<think>")
+			if openIndex == -1 {
+				// 没有找到开始标签，返回所有内容
+				f.buffer.Reset()
+				return content
+			}
+			
+			// 找到开始标签，保留标签前的内容
+			result := content[:openIndex]
+			f.inThinkTag = true
+			content = content[openIndex+7:] // 跳过"<think>"
+			f.buffer.Reset()
+			f.buffer.WriteString(content)
+			return result
+		} else {
+			// 在think标签内，查找结束标签
+			closeIndex := strings.Index(content, "</think>")
+			if closeIndex == -1 {
+				// 没有找到结束标签，丢弃所有内容
+				f.buffer.Reset()
+				return ""
+			}
+			
+			// 找到结束标签，跳过标签内容和结束标签
+			f.inThinkTag = false
+			content = content[closeIndex+8:] // 跳过"</think>"
+			f.buffer.Reset()
+			f.buffer.WriteString(content)
+			// 继续处理剩余内容
+		}
+	}
 }
 
 func NewRelayChat(c *gin.Context) *relayChat {
@@ -31,6 +91,7 @@ func NewRelayChat(c *gin.Context) *relayChat {
 			allowHeartbeat: true,
 			c:              c,
 		},
+		thinkTagFilter: newThinkTagStreamFilter(),
 	}
 	return relay
 }
@@ -157,7 +218,7 @@ func (r *relayChat) send() (err *types.OpenAIErrorWithStatusCode, done bool) {
 		}
 
 		var firstResponseTime time.Time
-		firstResponseTime, err = responseStreamClient(r.c, response, doneStr)
+		firstResponseTime, err = r.responseStreamClientWithFilter(r.c, response, doneStr)
 		r.SetFirstResponseTime(firstResponseTime)
 	} else {
 		var response *types.ChatCompletionResponse
@@ -183,6 +244,106 @@ func (r *relayChat) send() (err *types.OpenAIErrorWithStatusCode, done bool) {
 	}
 
 	return
+}
+
+// responseStreamClientWithFilter 带有think标签过滤的流式响应处理
+func (r *relayChat) responseStreamClientWithFilter(c *gin.Context, stream requester.StreamReaderInterface[string], endHandler func() string) (firstResponseTime time.Time, errWithOP *types.OpenAIErrorWithStatusCode) {
+	requester.SetEventStreamHeaders(c)
+	dataChan, errChan := stream.Recv()
+
+	// 创建一个done channel用于通知处理完成
+	done := make(chan struct{})
+	var finalErr *types.OpenAIErrorWithStatusCode
+
+	defer stream.Close()
+
+	var isFirstResponse bool
+
+	// 在新的goroutine中处理stream数据
+	go func() {
+		defer close(done)
+
+		for {
+			select {
+			case data, ok := <-dataChan:
+				if !ok {
+					return
+				}
+				
+				// 使用think标签过滤器处理数据
+				filteredData := r.thinkTagFilter.Filter(data)
+				
+				// 只有当过滤后的数据不为空时才发送
+				if filteredData != "" {
+					streamData := "data: " + filteredData + "\n\n"
+
+					if !isFirstResponse {
+						firstResponseTime = time.Now()
+						isFirstResponse = true
+					}
+
+					// 尝试写入数据，如果客户端断开也继续处理
+					select {
+					case <-c.Request.Context().Done():
+						// 客户端已断开，不执行任何操作，直接跳过
+					default:
+						// 客户端正常，发送数据
+						c.Writer.Write([]byte(streamData))
+						c.Writer.Flush()
+					}
+				}
+
+			case err := <-errChan:
+				if !errors.Is(err, io.EOF) {
+					// 处理错误情况
+					errMsg := "data: " + err.Error() + "\n\n"
+					select {
+					case <-c.Request.Context().Done():
+						// 客户端已断开，不执行任何操作，直接跳过
+					default:
+						// 客户端正常，发送错误信息
+						c.Writer.Write([]byte(errMsg))
+						c.Writer.Flush()
+					}
+
+					finalErr = common.StringErrorWrapper(err.Error(), "stream_error", 900)
+				} else {
+					// 正常结束，处理endHandler
+					if finalErr == nil && endHandler != nil {
+						streamData := endHandler()
+						if streamData != "" {
+							select {
+							case <-c.Request.Context().Done():
+								// 客户端已断开，不执行任何操作，直接跳过
+							default:
+								// 客户端正常，发送数据
+								c.Writer.Write([]byte("data: " + streamData + "\n\n"))
+								c.Writer.Flush()
+							}
+						}
+					}
+
+					// 发送结束标记
+					streamData := "data: [DONE]\n\n"
+					select {
+					case <-c.Request.Context().Done():
+						// 客户端已断开，不执行任何操作，直接跳过
+					default:
+						// 客户端正常，发送数据
+						c.Writer.Write([]byte(streamData))
+						c.Writer.Flush()
+					}
+				}
+				return
+			}
+		}
+	}()
+
+	// 等待处理完成
+	<-done
+
+	errWithOP = finalErr
+	return firstResponseTime, errWithOP
 }
 
 func (r *relayChat) getUsageResponse() string {
@@ -227,7 +388,7 @@ func (r *relayChat) compatibleSend(resProvider providersBase.ResponsesInterface)
 		}
 
 		var firstResponseTime time.Time
-		firstResponseTime, err = responseStreamClient(r.c, response, doneStr)
+		firstResponseTime, err = r.responseStreamClientWithFilter(r.c, response, doneStr)
 		r.SetFirstResponseTime(firstResponseTime)
 	} else {
 		var response *types.OpenAIResponsesResponses
