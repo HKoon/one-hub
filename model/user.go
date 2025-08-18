@@ -466,6 +466,15 @@ func GetRootUserEmail() (email string) {
 	return email
 }
 
+func GetRootUser() (*User, error) {
+	var user User
+	err := DB.Where("role = ?", config.RoleRootUser).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func UpdateUserUsedQuotaAndRequestCount(id int, quota int) {
 	if config.BatchUpdateEnabled {
 		AddNewRecord(BatchUpdateTypeUsedQuota, id, quota)

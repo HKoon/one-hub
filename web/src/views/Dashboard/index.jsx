@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Grid, Box, Stack, Typography, Button } from '@mui/material';
+import { Grid, Box, Stack, Typography, Button, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import { gridSpacing } from 'store/constant';
 import StatisticalLineChartCard from './component/StatisticalLineChartCard';
 import ApexCharts from 'ui-component/chart/ApexCharts';
@@ -49,9 +49,55 @@ const Dashboard = () => {
 
   const [dashboardData, setDashboardData] = useState(null);
   const siteInfo = useSelector((state) => state.siteInfo);
+  const account = useSelector((state) => state.account);
+  
+  // 用户选择器相关状态
+  const [usersList, setUsersList] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('self');
+  const [selectedUserInfo, setSelectedUserInfo] = useState(null);
+  
+  // 检查当前用户是否为管理员
+  const isAdmin = account.user && (account.user.role >= 10);
 
   const handleTabChange = (newValue) => {
     setCurrentTab(newValue);
+  };
+
+  // 获取用户列表（仅管理员可用）
+  const fetchUsersList = async () => {
+    if (!isAdmin) return;
+    
+    try {
+      const res = await API.get('/api/admin/users/selector');
+      const { success, message, data } = res.data;
+      if (success) {
+        setUsersList(data || []);
+        // 默认选择超级管理员（role = 100）
+        const rootUser = data.find(user => user.role === 100);
+        if (rootUser) {
+          setSelectedUserId(rootUser.id.toString());
+        }
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      console.error('获取用户列表失败:', error);
+    }
+  };
+
+  // 处理用户选择变化
+  const handleUserChange = (event) => {
+    const userId = event.target.value;
+    setSelectedUserId(userId);
+    
+    if (userId === 'self') {
+      setSelectedUserInfo(null);
+      userDashboard(); // 获取自己的数据
+    } else {
+      const selectedUser = usersList.find(user => user.id.toString() === userId);
+      setSelectedUserInfo(selectedUser);
+      fetchUserDashboard(userId); // 获取指定用户的数据
+    }
   };
 
   const userDashboard = async () => {
@@ -77,9 +123,66 @@ const Dashboard = () => {
     }
   };
 
+  // 获取指定用户的仪表盘数据（管理员功能）
+  const fetchUserDashboard = async (userId) => {
+    if (!isAdmin) return;
+    
+    setLoading(true);
+    try {
+      const res = await API.get(`/api/admin/dashboard/${userId}`);
+      const { success, message, data, user_info } = res.data;
+      if (success) {
+        if (data) {
+          setDashboardData(data);
+          let lineData = getLineDataGroup(data);
+          setRequestChart(getLineCardOption(lineData, 'RequestCount'));
+          setQuotaChart(getLineCardOption(lineData, 'Quota'));
+          setTokenChart(getLineCardOption(lineData, 'PromptTokens'));
+          setStatisticalData(getBarDataGroup(data));
+          setModelUsageData(getModelUsageData(data));
+          
+          // 更新选中用户信息
+          if (user_info) {
+            setSelectedUserInfo(user_info);
+          }
+        }
+      } else {
+        showError(message);
+      }
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      showError('获取用户数据失败');
+    }
+  };
+
   useEffect(() => {
-    userDashboard();
-  }, []);
+    if (isAdmin) {
+      // 管理员先获取用户列表，然后加载默认用户（超级管理员）的数据
+      fetchUsersList().then(() => {
+        // 在获取用户列表后，检查是否有默认选择的用户
+        if (selectedUserId !== 'self') {
+          fetchUserDashboard(selectedUserId);
+        } else {
+          userDashboard();
+        }
+      });
+    } else {
+      // 普通用户直接加载自己的数据
+      userDashboard();
+    }
+  }, [isAdmin]);
+
+  // 当选择的用户ID变化时，重新加载数据
+  useEffect(() => {
+    if (isAdmin && usersList.length > 0) {
+      const rootUser = usersList.find(user => user.role === 100);
+      if (rootUser && selectedUserId === 'self') {
+        setSelectedUserId(rootUser.id.toString());
+        fetchUserDashboard(rootUser.id.toString());
+      }
+    }
+  }, [usersList, isAdmin]);
 
   // Dashboard content
   const dashboardContent = (
@@ -162,6 +265,11 @@ const Dashboard = () => {
             <Typography variant="h2">{t('dashboard_index.title')}</Typography>
             <Typography variant="subtitle1" color="text.secondary">
               Dashboard
+              {selectedUserInfo && (
+                <span style={{ marginLeft: '8px', fontWeight: 'bold', color: '#1976d2' }}>
+                  - {selectedUserInfo.display_name || selectedUserInfo.username}
+                </span>
+              )}
             </Typography>
           </Stack>
 
@@ -204,6 +312,27 @@ const Dashboard = () => {
             </Stack>
           )}
         </Stack>
+        
+        {/* 用户选择器 - 仅管理员可见 */}
+        {isAdmin && (
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>查看用户数据</InputLabel>
+            <Select
+              value={selectedUserId}
+              label="查看用户数据"
+              onChange={handleUserChange}
+            >
+              <MenuItem value="self">查看我的数据</MenuItem>
+              {usersList.map((user) => (
+                <MenuItem key={user.id} value={user.id.toString()}>
+                  {user.display_name || user.username} 
+                  {user.role === 100 && ' (超级管理员)'}
+                  {user.role >= 10 && user.role < 100 && ' (管理员)'}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
       </Stack>
 
       {siteInfo.UptimeEnabled ? (

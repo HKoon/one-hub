@@ -305,6 +305,127 @@ func GetUserDashboard(c *gin.Context) {
 	})
 }
 
+// GetUsersForSelector 获取用户列表供前端选择器使用
+func GetUsersForSelector(c *gin.Context) {
+	// 获取当前用户角色
+	myRole := c.GetInt("role")
+	
+	// 只有管理员和超级管理员可以访问
+	if myRole < config.RoleAdminUser {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "权限不足",
+		})
+		return
+	}
+
+	// 获取所有用户的基本信息
+	var users []model.User
+	err := model.DB.Select("id, username, display_name, role").Find(&users).Error
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "无法获取用户列表",
+		})
+		return
+	}
+
+	// 过滤用户列表，只返回基本信息
+	userList := make([]gin.H, 0)
+	for _, user := range users {
+		userList = append(userList, gin.H{
+			"id":           user.Id,
+			"username":     user.Username,
+			"display_name": user.DisplayName,
+			"role":         user.Role,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    userList,
+	})
+}
+
+// GetUserDashboardByAdmin 允许管理员和超级管理员查看指定用户的dashboard数据
+func GetUserDashboardByAdmin(c *gin.Context) {
+	// 获取当前用户角色
+	myRole := c.GetInt("role")
+	
+	// 只有管理员和超级管理员可以访问
+	if myRole < config.RoleAdminUser {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "权限不足",
+		})
+		return
+	}
+
+	// 获取要查看的用户ID
+	userIdStr := c.Param("id")
+	var userId int
+	var err error
+	
+	if userIdStr == "" || userIdStr == "default" {
+		// 如果没有指定用户ID或者是default，则获取超级管理员的ID
+		rootUser, err := model.GetRootUser()
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无法获取超级管理员信息",
+			})
+			return
+		}
+		userId = rootUser.Id
+	} else {
+		userId, err = strconv.Atoi(userIdStr)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无效的用户ID",
+			})
+			return
+		}
+	}
+
+	// 验证目标用户是否存在
+	targetUser, err := model.GetUserById(userId, false)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "用户不存在",
+		})
+		return
+	}
+
+	now := time.Now()
+	toDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endOfDay := toDay.Add(-time.Second).Add(time.Hour * 24).Format("2006-01-02")
+	startOfDay := toDay.AddDate(0, 0, -7).Format("2006-01-02")
+
+	dashboards, err := model.GetUserModelStatisticsByPeriod(userId, startOfDay, endOfDay)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "无法获取统计信息",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    dashboards,
+		"user_info": gin.H{
+			"id": targetUser.Id,
+			"username": targetUser.Username,
+			"display_name": targetUser.DisplayName,
+			"role": targetUser.Role,
+		},
+	})
+}
+
 func GenerateAccessToken(c *gin.Context) {
 	id := c.GetInt("id")
 	user, err := model.GetUserById(id, true)

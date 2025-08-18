@@ -84,6 +84,8 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.POST("/quota/:id", controller.ChangeUserQuota)
 				adminRoute.PUT("/", controller.UpdateUser)
 				adminRoute.DELETE("/:id", controller.DeleteUser)
+				adminRoute.GET("/dashboard/:id", controller.GetUserDashboardByAdmin)
+		adminRoute.GET("/users/selector", controller.GetUsersForSelector)
 			}
 		}
 		optionRoute := apiRouter.Group("/option")
