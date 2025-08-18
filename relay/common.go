@@ -393,11 +393,11 @@ func shouldRetry(c *gin.Context, apiErr *types.OpenAIErrorWithStatusCode, channe
 
 	// 检查是否为网络连接错误，这类错误即使是LocalError也应该重试
 	isNetworkError := strings.Contains(apiErr.Message, "请求上游地址失败") ||
-					 strings.Contains(apiErr.Message, "connection reset by peer") ||
-					 strings.Contains(apiErr.Message, "connection refused") ||
-					 strings.Contains(apiErr.Message, "timeout") ||
-					 strings.Contains(apiErr.Message, "EOF") ||
-					 strings.Contains(apiErr.Message, "broken pipe")
+		strings.Contains(apiErr.Message, "connection reset by peer") ||
+		strings.Contains(apiErr.Message, "connection refused") ||
+		strings.Contains(apiErr.Message, "timeout") ||
+		strings.Contains(apiErr.Message, "EOF") ||
+		strings.Contains(apiErr.Message, "broken pipe")
 
 	// 对于非网络错误的LocalError，不重试
 	if apiErr.LocalError && !isNetworkError {

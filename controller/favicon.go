@@ -3,7 +3,6 @@ package controller
 import (
 	"embed"
 	"fmt"
-	"github.com/spf13/viper"
 	"io"
 	"net/http"
 	"one-api/common/logger"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/spf13/viper"
 
 	"github.com/gin-gonic/gin"
 )

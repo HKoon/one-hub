@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/net/proxy"
 	"net"
 	"net/http"
 	"net/url"
@@ -17,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/net/proxy"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"

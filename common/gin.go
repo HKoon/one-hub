@@ -45,13 +45,13 @@ func ErrorWrapper(err error, code string, statusCode int) *types.OpenAIErrorWith
 	}
 
 	// 检测各种网络连接错误
-	if strings.Contains(errString, "Post") || 
-	   strings.Contains(errString, "dial") ||
-	   strings.Contains(errString, "connection reset by peer") ||
-	   strings.Contains(errString, "connection refused") ||
-	   strings.Contains(errString, "timeout") ||
-	   strings.Contains(errString, "EOF") ||
-	   strings.Contains(errString, "broken pipe") {
+	if strings.Contains(errString, "Post") ||
+		strings.Contains(errString, "dial") ||
+		strings.Contains(errString, "connection reset by peer") ||
+		strings.Contains(errString, "connection refused") ||
+		strings.Contains(errString, "timeout") ||
+		strings.Contains(errString, "EOF") ||
+		strings.Contains(errString, "broken pipe") {
 		logger.SysError(fmt.Sprintf("network error: %s", errString))
 		errString = "请求上游地址失败"
 	}
@@ -61,26 +61,26 @@ func ErrorWrapper(err error, code string, statusCode int) *types.OpenAIErrorWith
 
 func ErrorWrapperLocal(err error, code string, statusCode int) *types.OpenAIErrorWithStatusCode {
 	openaiErr := ErrorWrapper(err, code, statusCode)
-	
+
 	// 检查是否为网络连接错误，这类错误不应该标记为LocalError以便重试
 	errString := ""
 	if err != nil {
 		errString = err.Error()
 	}
-	
+
 	isNetworkError := strings.Contains(errString, "Post") ||
-					 strings.Contains(errString, "dial") ||
-					 strings.Contains(errString, "connection reset by peer") ||
-					 strings.Contains(errString, "connection refused") ||
-					 strings.Contains(errString, "timeout") ||
-					 strings.Contains(errString, "EOF") ||
-					 strings.Contains(errString, "broken pipe")
-	
+		strings.Contains(errString, "dial") ||
+		strings.Contains(errString, "connection reset by peer") ||
+		strings.Contains(errString, "connection refused") ||
+		strings.Contains(errString, "timeout") ||
+		strings.Contains(errString, "EOF") ||
+		strings.Contains(errString, "broken pipe")
+
 	// 只有非网络错误才标记为LocalError
 	if !isNetworkError {
 		openaiErr.LocalError = true
 	}
-	
+
 	return openaiErr
 }
 
