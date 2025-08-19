@@ -68,7 +68,7 @@ const Dashboard = () => {
     if (!isAdmin) return;
     
     try {
-      const res = await API.get('/api/admin/users/selector');
+      const res = await API.get('/api/user/users/selector');
       const { success, message, data } = res.data;
       if (success) {
         setUsersList(data || []);
@@ -129,7 +129,7 @@ const Dashboard = () => {
     
     setLoading(true);
     try {
-      const res = await API.get(`/api/admin/dashboard/${userId}`);
+      const res = await API.get(`/api/user/dashboard/${userId}`);
       const { success, message, data, user_info } = res.data;
       if (success) {
         if (data) {
